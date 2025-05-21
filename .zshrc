@@ -137,3 +137,11 @@ export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # system reporting
 fastfetch
+
+# adding go and fabric paths
+export PATH=$PATH:/usr/local/go/bin
+export PATH=$PATH:/home/$USER/go/bin
+# some define alias for fabric user frindly approach
+alias ytsum='function _ytsum() { fabric -y "$1" --stream --pattern youtube_summary; }; _ytsum'
+alias claims='xclip -selection clipboard -o | fabric --stream --pattern analyze_claims'
+alias summarize='xclip -selection clipboard -o | fabric --stream --pattern summarize'
