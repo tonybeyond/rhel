@@ -551,7 +551,7 @@ setup_zsh() {
             fi
             
             echo "Downloading and replacing .zshrc file for user $ACTUAL_USER..."
-            su - $ACTUAL_USER -c 'curl -fsSL -o ~/.zshrc https://raw.githubusercontent.com/tonybeyond/almalinux/main/.zshrc'
+            su - $ACTUAL_USER -c 'curl -fsSL -o ~/.zshrc https://raw.githubusercontent.com/tonybeyond/rhel/main/.zshrc'
             echo "ZSH setup complete with custom .zshrc file for user $ACTUAL_USER"
         else
              echo "Skipping Oh My Zsh and user-specific ZSH config for root or if ACTUAL_USER is not set."
