@@ -26,11 +26,12 @@ get_actual_user() {
     USER_HOME=$(eval echo ~$ACTUAL_USER)
 }
 
-# Function to detect OS type and version
+# Add this function to detect OS type and version
 detect_os() {
     if grep -q -i "rhel" /etc/os-release; then
         OS_TYPE="rhel"
         OS_VERSION=$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)
+        OS_MAJOR_VERSION=$(echo $OS_VERSION | cut -d. -f1)
         echo "Red Hat Enterprise Linux $OS_VERSION detected"
     elif grep -q -i "almalinux" /etc/os-release; then
         OS_TYPE="almalinux"
@@ -44,39 +45,21 @@ detect_os() {
         OS_TYPE="unknown"
         echo "Unknown OS type. Script may not work as expected."
     fi
-    
-    # Get major version (e.g., 8 or 9 from 8.10 or 9.4)
-    OS_MAJOR_VERSION=$(echo $OS_VERSION | cut -d. -f1)
 }
 
-# Function to enable necessary repositories
+# Update the enable_repos function
 enable_repos() {
-    echo "Enabling necessary repositories..."
+    detect_os
     
-    # First ensure dnf-utils is installed for config-manager functionality
-    dnf install -y dnf-utils
+    echo "Enabling necessary repositories for $OS_TYPE..."
     
     if [ "$OS_TYPE" = "rhel" ]; then
-        # For RHEL, we use subscription-manager
-        echo "Setting up RHEL repositories..."
-        
-        # Check if system is registered
-        if ! subscription-manager identity &>/dev/null; then
-            echo "WARNING: System does not appear to be registered with Red Hat. Some repositories may not be available."
-            echo "Please register using 'subscription-manager register' before continuing."
-            read -p "Continue anyway? (y/n): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
-        fi
-        
-        # Enable CodeReady Builder repository for RHEL
-        echo "Enabling CodeReady Builder repository..."
-        if [ "$OS_MAJOR_VERSION" = "8" ]; then
-            subscription-manager repos --enable "codeready-builder-for-rhel-8-$(arch)-rpms" || echo "Failed to enable CodeReady Builder repository. May need manual configuration."
-        elif [ "$OS_MAJOR_VERSION" = "9" ]; then
-            subscription-manager repos --enable "codeready-builder-for-rhel-9-$(arch)-rpms" || echo "Failed to enable CodeReady Builder repository. May need manual configuration."
+        # For RHEL systems
+        if [ "$OS_MAJOR_VERSION" = "10" ]; then
+            echo "Enabling CodeReady Linux Builder repository for RHEL 10..."
+            subscription-manager repos --enable "codeready-builder-for-rhel-10-$(arch)-rpms" || echo "Failed to enable CodeReady Builder repository. May need manual configuration."
+        else
+            echo "RHEL version $OS_VERSION detected. Please check repository names for this version."
         fi
     else
         # For AlmaLinux and Rocky Linux
@@ -93,25 +76,29 @@ enable_repos() {
     fi
 }
 
-# Function to update the system
-update_system() {
-    echo "Updating system..."
-    dnf update -y
-    dnf upgrade -y
-}
-
-# Function to install EPEL repository (updated for RHEL)
+# Update the install_epel function
 install_epel() {
     echo "Installing EPEL repository..."
     
+    # First ensure we've detected the OS
+    if [ -z "$OS_TYPE" ]; then
+        detect_os
+    fi
+    
     if [ "$OS_TYPE" = "rhel" ]; then
-        # RHEL-specific EPEL installation
-        if [ "$OS_MAJOR_VERSION" = "8" ]; then
-            dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-        elif [ "$OS_MAJOR_VERSION" = "9" ]; then
-            dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+        echo "RHEL detected. Using RHEL-specific EPEL installation method..."
+        
+        # Install EPEL based on RHEL version
+        if [ "$OS_MAJOR_VERSION" = "10" ]; then
+            echo "Installing EPEL for RHEL 10..."
+            # Direct URL installation for RHEL 10
+            dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm || {
+                echo "Failed to install EPEL for RHEL 10. Check if the URL is up-to-date."
+                return 1
+            }
         else
-            echo "Unsupported RHEL version. EPEL installation may fail."
+            echo "RHEL version $OS_VERSION detected, but specific EPEL URL not configured."
+            echo "Attempting generic installation. This may fail."
             dnf install -y epel-release
         fi
     else
@@ -124,22 +111,24 @@ install_epel() {
         fi
     fi
 
+    # Verify EPEL is enabled
     if ! dnf repolist enabled | grep -q -E '^epel\s'; then
         echo "EPEL repository not found in enabled repos. Attempting to enable it..."
-        if dnf config-manager --set-enabled epel; then
-            echo "EPEL repository explicitly enabled."
-        else
-            echo "WARNING: Failed to enable EPEL repository. 'eza' and other EPEL packages might not be found."
-        fi
+        dnf config-manager --set-enabled epel || echo "WARNING: Failed to enable EPEL repository."
     fi
     
-    echo "Refreshing DNF cache for EPEL repository..."
-    if dnf makecache --repo=epel; then 
-        echo "DNF cache refreshed for EPEL."
-    else
-        echo "WARNING: Failed to refresh DNF cache for EPEL. 'eza' might still not be found."
-    fi
+    # Refresh cache
+    dnf makecache --repo=epel || echo "WARNING: Failed to refresh DNF cache for EPEL."
 }
+
+
+# Function to update the system
+update_system() {
+    echo "Updating system..."
+    dnf update -y
+    dnf upgrade -y
+}
+
 
 # Function to install common tools and utilities
 install_common_tools() {
