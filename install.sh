@@ -581,20 +581,7 @@ main() {
     update_system
     install_epel
     install_common_tools
-    
-    # Install Pop Shell using improved method for RHEL
-    if [ "$OS_TYPE" = "rhel" ]; then
-        install_pop_shell
-    elif [ "$OS_TYPE" = "fedora" ]; then
-        # For Fedora, it's available in the repositories
-        dnf install -y gnome-shell-extension-pop-shell xprop
-    else
-        # For other distros like AlmaLinux/Rocky, try package first, then source
-        if ! dnf install -y gnome-shell-extension-pop-shell; then
-            install_pop_shell
-        fi
-    fi
-    
+       
     # Install eza (modern ls replacement) from source
     install_eza_from_source
      # Add ~/.cargo/bin to PATH so eza works
@@ -609,6 +596,18 @@ main() {
     setup_firewall
     optimize_system
     setup_zsh
+    # Install Pop Shell using improved method for RHEL
+    if [ "$OS_TYPE" = "rhel" ]; then
+        install_pop_shell
+    elif [ "$OS_TYPE" = "fedora" ]; then
+        # For Fedora, it's available in the repositories
+        dnf install -y gnome-shell-extension-pop-shell xprop
+    else
+        # For other distros like AlmaLinux/Rocky, try package first, then source
+        if ! dnf install -y gnome-shell-extension-pop-shell; then
+            install_pop_shell
+        fi
+    fi    
     cleanup
 
     echo "System setup and optimization complete!"
