@@ -415,6 +415,10 @@ install_flatpak_apps() {
         "dev.zed.Zed"
         "com.belmoussaoui.Obfuscate"
         "com.rustdesk.RustDesk"
+        "com.github.johnfactotum.Foliate"
+        "app.zen_browser.zen"
+        "org.chromium.Chromium"
+        "org.feichtmeier.Musicpod"
     )
 
     INSTALL_CMD_PREFIX=""
@@ -596,6 +600,7 @@ main() {
     setup_firewall
     optimize_system
     setup_zsh
+    cleanup
     # Install Pop Shell using improved method for RHEL
     if [ "$OS_TYPE" = "rhel" ]; then
         install_pop_shell
@@ -608,7 +613,6 @@ main() {
             install_pop_shell
         fi
     fi    
-    cleanup
 
     echo "System setup and optimization complete!"
     echo "Flatpak applications installed."
