@@ -418,6 +418,7 @@ install_flatpak_apps() {
         "com.github.johnfactotum.Foliate"
         "app.zen_browser.zen"
         "org.chromium.Chromium"
+        "com.microsoft.Edge"
         "org.feichtmeier.Musicpod"
     )
 
