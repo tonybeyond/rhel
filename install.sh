@@ -133,7 +133,7 @@ update_system() {
 # Function to install common tools and utilities
 install_common_tools() {
     echo "Installing common tools and utilities..."
-    dnf install -y ntfs-3g libva libvdpau libva-devel libvdpau-devel neovim wget curl git btop tmux zsh neofetch fzf
+    dnf install -y libva libvdpau libva-devel libvdpau-devel neovim wget curl git btop tmux zsh fastfetch fzf
     
     # Install GNOME extensions if not RHEL (may require different approach for RHEL)
     if [ "$OS_TYPE" != "rhel" ]; then
