@@ -321,6 +321,45 @@ install_eza_from_source() {
     fi
 }
 
+add_cargo_to_path() {
+    echo "Adding ~/.cargo/bin to PATH for eza and other Rust binaries..."
+    
+    CARGO_PATH_EXPORT="export PATH=\"\$HOME/.cargo/bin:\$PATH\""
+    
+    if [ -n "$ACTUAL_USER" ] && [ "$ACTUAL_USER" != "root" ]; then
+        # Add to user's .bashrc if it exists
+        if [ -f "$USER_HOME/.bashrc" ]; then
+            if ! grep -q "/.cargo/bin" "$USER_HOME/.bashrc"; then
+                echo -e "\n# Add cargo binaries to PATH\n${CARGO_PATH_EXPORT}" >> "$USER_HOME/.bashrc"
+                echo "Added cargo bin to PATH in $USER_HOME/.bashrc"
+            fi
+        fi
+        
+        # Add to user's .zshrc if it exists
+        if [ -f "$USER_HOME/.zshrc" ]; then
+            if ! grep -q "/.cargo/bin" "$USER_HOME/.zshrc"; then
+                echo -e "\n# Add cargo binaries to PATH\n${CARGO_PATH_EXPORT}" >> "$USER_HOME/.zshrc"
+                echo "Added cargo bin to PATH in $USER_HOME/.zshrc"
+            fi
+        fi
+        
+        # Make it available in the current session for the actual user
+        su - $ACTUAL_USER -c "export PATH=\"\$HOME/.cargo/bin:\$PATH\""
+    fi
+    
+    # Also add to root's config files
+    if [ -f "/root/.bashrc" ] && ! grep -q "/.cargo/bin" "/root/.bashrc" 2>/dev/null; then
+        echo -e "\n# Add cargo binaries to PATH\n${CARGO_PATH_EXPORT}" >> "/root/.bashrc"
+        echo "Added cargo bin to PATH in /root/.bashrc"
+    fi
+    
+    # Make it available in the current shell session
+    export PATH="$HOME/.cargo/bin:$PATH"
+    
+    echo "Cargo binaries should now be accessible in PATH"
+}
+
+
 install_ghostty_terminal() {
     echo "Installing Ghostty terminal..."
     if ! command -v ghostty &> /dev/null; then
@@ -558,6 +597,8 @@ main() {
     
     # Install eza (modern ls replacement) from source
     install_eza_from_source
+     # Add ~/.cargo/bin to PATH so eza works
+    add_cargo_to_path
     
     install_ghostty_terminal
     setup_flatpak
