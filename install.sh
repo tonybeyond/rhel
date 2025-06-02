@@ -456,7 +456,6 @@ install_dev_tools() {
 install_virt_tools() {
     echo "Installing virtualization host packages..."
     dnf groupinstall -y "Virtualization Host"
-    dnf install -y virt-manager
 }
 
 install_brave_browser() {
