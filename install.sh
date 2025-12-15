@@ -41,6 +41,11 @@ detect_os() {
         OS_TYPE="rocky"
         OS_VERSION=$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)
         echo "Rocky Linux $OS_VERSION detected"
+    elif grep -q -i "oracle" /etc/os-release || grep -q -i "ol" /etc/os-release; then
+        OS_TYPE="oracle"
+        OS_VERSION=$(grep -oP '(?<=VERSION_ID=")[^"]+' /etc/os-release)
+        OS_MAJOR_VERSION=$(echo $OS_VERSION | cut -d. -f1)
+        echo "Oracle Linux $OS_VERSION detected"
     else
         OS_TYPE="unknown"
         echo "Unknown OS type. Script may not work as expected."
@@ -78,6 +83,19 @@ enable_repos() {
         elif [ "$OS_MAJOR_VERSION" = "10" ]; then
             subscription-manager repos --enable "codeready-builder-for-rhel-10-$(arch)-rpms" || echo "Failed to enable CodeReady Builder repository. May need manual configuration."
         fi
+    elif [ "$OS_TYPE" = "oracle" ]; then
+        # For Oracle Linux
+        echo "Enabling CodeReady Builder equivalent for Oracle Linux..."
+        # Oracle linux usually enables repos via dnf config-manager or dedicated release packages
+        # For OL10, anticipating standard patterns (CRB/CodeReady Builder)
+        if [ "$OS_MAJOR_VERSION" = "10" ]; then
+             dnf config-manager --set-enabled ol10_codeready_builder || echo "Failed to enable ol10_codeready_builder. Checking if it's already enabled or named differently."
+        elif [ "$OS_MAJOR_VERSION" = "9" ]; then
+             dnf config-manager --set-enabled ol9_codeready_builder 
+        else
+             dnf config-manager --set-enabled ol8_codeready_builder
+        fi
+        
     else
         # For AlmaLinux and Rocky Linux
         echo "Enabling CRB repository..."
@@ -116,6 +134,20 @@ install_epel() {
             echo "Unsupported RHEL version. EPEL installation may fail."
             dnf install -y epel-release
         fi
+    elif [ "$OS_TYPE" = "oracle" ]; then
+        # For Oracle Linux
+        echo "Installing EPEL for Oracle Linux..."
+        # Often provided by oracle-epel-release-elX
+        if ! dnf install -y oracle-epel-release-el${OS_MAJOR_VERSION}; then
+             echo "oracle-epel-release package not found. Falling back to standard EPEL RPM..."
+              if [ "$OS_MAJOR_VERSION" = "8" ]; then
+                dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+            elif [ "$OS_MAJOR_VERSION" = "9" ]; then
+                dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+            elif [ "$OS_MAJOR_VERSION" = "10" ]; then
+                dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+            fi
+        fi
     else
         # For AlmaLinux and Rocky Linux
         if ! dnf list installed epel-release &>/dev/null; then
@@ -147,8 +179,8 @@ install_epel() {
 install_common_tools() {
     echo "Installing common tools and utilities..."
     
-    # Handle RHEL 10 package differences
-    if [ "$OS_TYPE" = "rhel" ] && [ "$OS_MAJOR_VERSION" = "10" ]; then
+    # Handle RHEL 10 and Oracle Linux 10 package differences
+    if ([ "$OS_TYPE" = "rhel" ] || [ "$OS_TYPE" = "oracle" ]) && [ "$OS_MAJOR_VERSION" = "10" ]; then
         # Try to install each package individually to avoid failing on missing ones
         for pkg in libva libvdpau libva-devel libvdpau-devel neovim wget curl git btop tmux zsh fzf; do
             dnf install -y $pkg || echo "Warning: Package $pkg not found, skipping."
@@ -182,11 +214,11 @@ install_common_tools() {
         # Skip GNOME extensions installation, we'll do it separately for Pop Shell
         echo "GNOME extensions will be installed separately."
     else
-        # For non-RHEL 10 systems
+        # For non-RHEL 10 / non-Oracle 10 systems
         dnf install -y libva libvdpau libva-devel libvdpau-devel neovim wget curl git btop tmux zsh neofetch fzf || echo "Some packages failed to install. Continuing..."
         
-        # Install other GNOME extensions if not RHEL (Pop Shell will be installed separately)
-        if [ "$OS_TYPE" != "rhel" ]; then
+        # Install other GNOME extensions if not RHEL/Oracle (Pop Shell will be installed separately)
+        if [ "$OS_TYPE" != "rhel" ] && [ "$OS_TYPE" != "oracle" ]; then
             dnf install -y gnome-shell-extension-user-theme gnome-shell-extension-workspace-indicator gnome-shell-extension-dash-to-panel || echo "Some GNOME extensions failed to install."
         fi
     fi
@@ -406,18 +438,14 @@ install_flatpak_apps() {
     
     FLATPAK_APPS=(
         "com.visualstudio.code"
-        "org.standardnotes.standardnotes"
         "com.github.flxzt.rnote"
         "com.github.tchx84.Flatseal"
         "org.videolan.VLC"
         "com.mattjakeman.ExtensionManager"
-        "io.github.brunofin.Cohesion"
         "dev.zed.Zed"
         "com.belmoussaoui.Obfuscate"
         "com.rustdesk.RustDesk"
         "com.github.johnfactotum.Foliate"
-        "app.zen_browser.zen"
-        "org.chromium.Chromium"
         "com.microsoft.Edge"
         "org.feichtmeier.Musicpod"
     )
@@ -594,15 +622,14 @@ main() {
     install_ghostty_terminal
     setup_flatpak
     install_flatpak_apps
-    install_brave_browser
-    install_dev_tools
-    install_virt_tools
+    #install_dev_tools
+    #install_virt_tools
     setup_firewall
     optimize_system
     setup_zsh
     cleanup
-    # Install Pop Shell using improved method for RHEL
-    if [ "$OS_TYPE" = "rhel" ]; then
+    # Install Pop Shell using improved method for RHEL/Oracle
+    if [ "$OS_TYPE" = "rhel" ] || [ "$OS_TYPE" = "oracle" ]; then
         install_pop_shell
     elif [ "$OS_TYPE" = "fedora" ]; then
         # For Fedora, it's available in the repositories
@@ -619,9 +646,9 @@ main() {
     echo "You may need to log out and log back in for ZSH changes to take full effect for user $ACTUAL_USER."
     echo "You may need to enable Pop Shell through the GNOME Extensions app after logging out and back in."
     
-    # Special message for RHEL 10
-    if [ "$OS_TYPE" = "rhel" ] && [ "$OS_MAJOR_VERSION" = "10" ]; then
-        echo "Note: This script has been configured for RHEL 10, which was just released. Some packages were installed from source."
+    # Special message for RHEL 10 / Oracle Linux 10
+    if ([ "$OS_TYPE" = "rhel" ] || [ "$OS_TYPE" = "oracle" ]) && [ "$OS_MAJOR_VERSION" = "10" ]; then
+        echo "Note: This script has been configured for RHEL/Oracle Linux 10. Some packages were installed from source."
     fi
     
     echo "Please reboot your system to apply all changes if kernel or core libraries were updated."
